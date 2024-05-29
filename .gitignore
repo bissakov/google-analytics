@@ -1,6 +1,7 @@
 .idea/*
 logs/*
 .mypy_cache/*
+secret/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
