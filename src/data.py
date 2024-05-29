@@ -1,8 +1,11 @@
 import dataclasses
+import itertools
 import os
+from dataclasses import fields
 from datetime import datetime, timedelta
 from typing import Dict, MutableSequence, Union
 
+import rich
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from google.analytics.data_v1beta.types import (
     DateRange,
@@ -11,13 +14,8 @@ from google.analytics.data_v1beta.types import (
     OrderBy,
     RunReportRequest,
 )
-
-MutableSequenceType = (
-    MutableSequence[Dimension]
-    | MutableSequence[Metric]
-    | MutableSequence[DateRange]
-    | MutableSequence[OrderBy]
-)
+from rich.console import Console
+from rich.table import Table
 
 
 @dataclasses.dataclass
@@ -27,31 +25,48 @@ class Report:
     metrics: MutableSequence[Metric]
     date_ranges: MutableSequence[DateRange]
     order_bys: MutableSequence[OrderBy]
+    keep_empty_rows: bool = True
 
     def as_dict(
         self,
     ) -> Dict[
         str,
-        Union[str, MutableSequenceType],
+        Union[
+            str,
+            MutableSequence[Dimension]
+            | MutableSequence[Metric]
+            | MutableSequence[DateRange]
+            | MutableSequence[OrderBy]
+            | bool,
+        ],
     ]:
-        return {
-            "property": self.property,
-            "dimensions": self.dimensions,
-            "metrics": self.metrics,
-            "date_ranges": self.date_ranges,
-            "order_bys": self.order_bys,
-        }
+        return {field.name: getattr(self, field.name) for field in fields(self)}
 
 
 def sample_run_report(report: Report) -> None:
     client = BetaAnalyticsDataClient()
 
+    rich.print(report.as_dict())
     request = RunReportRequest(report.as_dict())
     response = client.run_report(request)
 
-    print("Report result:")
+    table = Table(title="Report Data")
+
+    for dimension in response.dimension_headers:
+        table.add_column(dimension.name, justify="center", no_wrap=True)
+    for metric in response.metric_headers:
+        table.add_column(metric.name, justify="center", no_wrap=True)
+
     for row in response.rows:
-        print(row)
+        table.add_row(
+            *itertools.chain(
+                [x.value for x in row.dimension_values],
+                [x.value for x in row.metric_values],
+            )
+        )
+
+    console = Console()
+    console.print(table)
 
 
 def main() -> None:
@@ -63,24 +78,20 @@ def main() -> None:
     today = datetime.now()
     yesterday = today - timedelta(days=1)
     yesterday_str = yesterday.strftime("%Y-%m-%d")
-    print(f"Yesterday: {yesterday_str}")
+
+    dimensions = ["date", "city", "cityId", "country", "countryId"]
+    metrics = [
+        "sessions",
+        "newUsers",
+        "totalUsers",
+        "bounceRate",
+        "userEngagementDuration",
+    ]
 
     report = Report(
         property="properties/400543665",
-        dimensions=[
-            Dimension({"name": "date"}),
-            Dimension({"name": "city"}),
-            Dimension({"name": "cityId"}),
-            Dimension({"name": "country"}),
-            Dimension({"name": "countryId"}),
-        ],
-        metrics=[
-            Metric({"name": "sessions"}),
-            Metric({"name": "newUsers"}),
-            Metric({"name": "totalUsers"}),
-            Metric({"name": "bounceRate"}),
-            Metric({"name": "userEngagementDuration"}),
-        ],
+        dimensions=[Dimension({"name": dimension}) for dimension in dimensions],
+        metrics=[Metric({"name": metric}) for metric in metrics],
         date_ranges=[
             DateRange({"start_date": "2024-01-01", "end_date": yesterday_str})
         ],
