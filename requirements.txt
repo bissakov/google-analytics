@@ -4,6 +4,7 @@ certifi==2024.2.2
 charset-normalizer==3.3.2
 click==8.1.7
 colorama==0.4.6
+google-analytics-admin==0.22.7
 google-analytics-data==0.18.7
 google-api-core==2.18.0
 google-auth==2.29.0
