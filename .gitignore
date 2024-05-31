@@ -2,6 +2,8 @@
 logs/*
 .mypy_cache/*
 secret/
+secret.7z
+pickle/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
