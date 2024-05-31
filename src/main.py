@@ -68,6 +68,10 @@ def main() -> None:
         date_range,
     )
 
+    for analytics_queue in analytics:
+        for row in analytics_queue:
+            logger.info(row)
+
 
 if __name__ == "__main__":
     main()

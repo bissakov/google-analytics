@@ -3,6 +3,7 @@ import itertools
 import logging
 import os
 import queue
+import uuid
 from dataclasses import fields
 from datetime import datetime
 from typing import Any, Dict, MutableSequence, Optional, Union
@@ -96,8 +97,11 @@ class AnalyticsRow:
     total_users: int
     bounce_rate: float
     user_engagement_duration: int
+    uuid: Optional[str] = None  # unique UUID for potential duplication in DB
 
     def __post_init__(self) -> None:
+        row_identifier = f"{self.date}_{self.city_id}_{self.country_code}"
+        self.uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, row_identifier))
         for field in dataclasses.fields(self):
             value = getattr(self, field.name)
             if not isinstance(value, str):
@@ -126,6 +130,7 @@ def process_response_row(
     row_data = process_response_columns(
         row_data, metric_headers, response_row.metric_values
     )
+
     return AnalyticsRow(
         date=datetime.strptime(row_data["date"], "%Y%m%d").strftime("%Y-%m-%d"),
         city=row_data["city"],
@@ -163,7 +168,7 @@ def fetch_analytics(
     service_credentials: str,
     accounts: MutableSequence[Account],
     date_range: DateRange,
-) -> None:
+) -> MutableSequence[Queue]:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_credentials
 
     dimensions = ["date", "city", "cityId", "country", "countryId"]
@@ -209,3 +214,5 @@ def fetch_analytics(
 
     logger.info(f"Fetched {sum(len(a) for a in analytics)} rows in total")
     logger.info("Done fetching analytics")
+
+    return analytics
