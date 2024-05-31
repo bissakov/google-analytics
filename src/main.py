@@ -6,6 +6,7 @@ from google.analytics.data_v1beta.types import DateRange
 
 from src.account_properties import fetch_account_and_properties
 from src.analytics import fetch_analytics
+from src.error import handle_global_exception
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +17,10 @@ def date_range_str(self: DateRange) -> str:
     return f"DateRange(start_date={start_date}, end_date={end_date})"
 
 
+# @handle_global_exception
 def main() -> None:
     today = datetime.today()
-    logger.info(f"Starting the process for {today.strftime("%Y-%m-%d")}")
+    logger.info(f"Starting the process for '{today.strftime("%Y-%m-%d")}'")
 
     yesterday = today - timedelta(days=1)
     yesterday_str = yesterday.strftime("%Y-%m-%d")

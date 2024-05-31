@@ -29,8 +29,8 @@ def handle_global_exception(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
-        except (Exception, BaseException) as ex:
-            logging.error(f"An unexpected error occurred: {ex}")
+        except (Exception, BaseException) as exc:
+            logging.error(f"An unexpected error occurred: {exc}")
             error_message = traceback.format_exc()
             notification.send_message(
                 f"An unexpected error occurred in Google Ads process:\n{error_message}"
