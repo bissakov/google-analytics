@@ -37,7 +37,6 @@ def main() -> None:
             "end_date": yesterday_str,
         }
     )
-
     logger.info(f"Fetching Google Analytics for {date_range}")
 
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,9 +76,9 @@ def main() -> None:
         date_range,
     )
 
-    for analytics_queue in analytics:
-        for row in analytics_queue:
-            logger.info(row)
+    # for analytics_queue in analytics:
+    #     for row in analytics_queue:
+    #         logger.info(row)
 
 
 if __name__ == "__main__":

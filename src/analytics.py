@@ -1,12 +1,14 @@
 import dataclasses
-import itertools
 import logging
 import os
-import queue
+import pathlib
+import pickle
+import sys
 import uuid
+from collections import deque
 from dataclasses import fields
 from datetime import datetime
-from typing import Any, Dict, MutableSequence, Optional, Union
+from typing import Any, Dict, MutableSequence, Optional, TypeVar, Union
 
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from google.analytics.data_v1beta.types import (
@@ -43,19 +45,17 @@ DimensionValues = MutableSequence[DimensionValue]
 MetricValues = MutableSequence[MetricValue]
 Values = Union[DimensionValues, MetricValues]
 
+T = TypeVar("T")
 
-class Queue(queue.Queue):
+
+class Deque(deque[T]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.size = 0
 
-    def put(self, item: Any) -> None:
-        super().put(item)
+    def append(self, item: Any) -> None:
+        super().append(item)
         self.size += 1
-
-    def __iter__(self):
-        while not self.empty():
-            yield self.get()
 
     def __len__(self) -> int:
         return self.size
@@ -146,12 +146,12 @@ def process_response_row(
 
 
 @handle_google_api_exception
-def run_report(request: RunReportRequest) -> Queue:
+def run_report(request: RunReportRequest) -> Deque[AnalyticsRow]:
     client = BetaAnalyticsDataClient()
 
     response = client.run_report(request=request)
 
-    analytics_queue = Queue()
+    analytics_queue = Deque()
 
     for row in response.rows:
         analytics_row = process_response_row(
@@ -159,7 +159,7 @@ def run_report(request: RunReportRequest) -> Queue:
             response.dimension_headers,
             response.metric_headers,
         )
-        analytics_queue.put(analytics_row)
+        analytics_queue.append(analytics_row)
 
     return analytics_queue
 
@@ -168,7 +168,25 @@ def fetch_analytics(
     service_credentials: str,
     accounts: MutableSequence[Account],
     date_range: DateRange,
-) -> MutableSequence[Queue]:
+) -> MutableSequence[Deque[AnalyticsRow]]:
+    pickle_dir = os.environ.get("PICKLE_DIR")
+    if not pickle_dir:
+        raise EnvironmentError("Missing 'PICKLE_DIR' environment variable")
+
+    analytics_pickle = pathlib.Path(
+        pickle_dir,
+        f"analytics_{date_range.start_date}_{date_range.end_date}.pkl",
+    ).as_posix()
+    if os.path.exists(analytics_pickle):
+        logger.info(
+            f"Loading analytics from '{analytics_pickle}' instead of fetching from API"
+        )
+        with open(analytics_pickle, "rb") as f:
+            analytics = pickle.load(f)
+
+        logger.info(f"Loaded {sum(len(a) for a in analytics)} rows in total")
+        return analytics
+
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_credentials
 
     dimensions = ["date", "city", "cityId", "country", "countryId"]
@@ -213,6 +231,15 @@ def fetch_analytics(
             )
 
     logger.info(f"Fetched {sum(len(a) for a in analytics)} rows in total")
-    logger.info("Done fetching analytics")
+
+    try:
+        logger.info(f"Saving analytics to '{analytics_pickle}'")
+        with open(analytics_pickle, "wb") as f:
+            pickle.dump(analytics, f)
+    except Exception as exc:
+        logger.error(f"Failed to save analytics to '{analytics_pickle}': {exc}")
+        if os.path.exists(analytics_pickle):
+            os.remove(analytics_pickle)
+        sys.exit(1)
 
     return analytics
