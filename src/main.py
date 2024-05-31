@@ -27,7 +27,7 @@ def main() -> None:
     DateRange.__repr__ = DateRange.__str__
     date_range = DateRange(
         {
-            # "start_date": "2024-01-01",
+            # "start_date": "2023-01-01",
             "start_date": yesterday_str,
             "end_date": yesterday_str,
         }
