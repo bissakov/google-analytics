@@ -1,6 +1,8 @@
 import dataclasses
 import logging
 import os
+import pathlib
+import pickle
 from typing import MutableSequence, cast
 
 from google.analytics.admin import AnalyticsAdminServiceClient
@@ -52,6 +54,23 @@ class Property:
 def fetch_account_and_properties(
     admin_credentials: str,
 ) -> MutableSequence[Account]:
+    pickle_dir = os.environ.get("PICKLE_DIR")
+    if not pickle_dir:
+        raise EnvironmentError("Missing 'PICKLE_DIR' environment variable")
+    yesterday = os.environ.get("YESTERDAY")
+    if not yesterday:
+        raise EnvironmentError("Missing 'YESTERDAY' environment variable")
+
+    accounts_pickle = pathlib.Path(
+        pickle_dir, f"accounts_{yesterday}.pkl"
+    ).as_posix()
+    if os.path.exists(accounts_pickle):
+        logger.info(
+            f"Loading accounts from '{accounts_pickle}' instead of fetching from API"
+        )
+        with open(accounts_pickle, "rb") as f:
+            return pickle.load(f)
+
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = admin_credentials
 
     client = AnalyticsAdminServiceClient()
@@ -103,9 +122,13 @@ def fetch_account_and_properties(
                 )
 
             logger.info(
-                f"Found {len(account.properties)} properties for account {account.name}"
+                f"Found {len(account.properties)} properties for account '{account.name}'"
             )
 
     logger.info("Accounts and properties fetched successfully")
+
+    logger.info(f"Saving accounts to '{accounts_pickle}'")
+    with open(accounts_pickle, "wb") as f:
+        pickle.dump(accounts, f)
 
     return accounts

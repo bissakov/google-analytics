@@ -24,6 +24,9 @@ def main() -> None:
 
     yesterday = today - timedelta(days=1)
     yesterday_str = yesterday.strftime("%Y-%m-%d")
+    os.environ["YESTERDAY"] = yesterday_str
+
+    month_year = yesterday.strftime("%Y/%B")
 
     DateRange.__str__ = date_range_str
     DateRange.__repr__ = DateRange.__str__
@@ -38,6 +41,10 @@ def main() -> None:
     logger.info(f"Fetching Google Analytics for {date_range}")
 
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    pickle_dir = os.path.join(project_dir, "pickle", month_year)
+    os.makedirs(pickle_dir, exist_ok=True)
+    os.environ["PICKLE_DIR"] = pickle_dir
 
     secret_dir = os.path.join(project_dir, "secret")
     if not os.path.exists(secret_dir):
